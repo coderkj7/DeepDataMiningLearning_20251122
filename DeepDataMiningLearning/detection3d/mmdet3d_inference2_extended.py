@@ -363,12 +363,13 @@ def get_bbox_top_center(bbox_tensor):
     Gets the top center position of a 3D bounding box for label placement.
 
     Args:
-        bbox_tensor: 7D bounding box [x, y, z, dx, dy, dz, heading]
+        bbox_tensor: bbox[..., :7] = [x, y, z, dx, dy, dz, heading]
 
     Returns:
         3D position [x, y, z] at the top center of the box
     """
-    x, y, z, dx, dy, dz, heading = bbox_tensor
+    arr = np.asarray(bbox_tensor, dtype=float)
+    x, y, z, dx, dy, dz, heading = arr[:7]
     # z in many outputs is bottom-center; top center is z + dz
     return [x, y, z + dz + 0.15]  # small offset above the box
 
@@ -378,7 +379,8 @@ def get_bbox_center(bbox_tensor):
     Returns the center position of a 3D bounding box [x, y, z].
     Useful for placing compact markers without height bias.
     """
-    x, y, z, dx, dy, dz, heading = bbox_tensor
+    arr = np.asarray(bbox_tensor, dtype=float)
+    x, y, z, dx, dy, dz, heading = arr[:7]
     # Convert bottom-center z -> geometric center for marker placement
     return [x, y, z + dz / 2.0]
 
@@ -592,6 +594,11 @@ def visualize_with_open3d(lidar_file, predictions_dict, gt_bboxes, out_dir, base
     # Get predicted boxes and labels
     pred_bboxes_list = predictions_dict['bboxes_3d']
     pred_bboxes_tensor = np.array(pred_bboxes_list)
+
+    # Some datasets (e.g., nuScenes) output 9D boxes: [x,y,z,dx,dy,dz,yaw,vx,vy]
+    # Our visualization uses only the first 7 dims.
+    if pred_bboxes_tensor.ndim == 2 and pred_bboxes_tensor.shape[1] > 7:
+        pred_bboxes_tensor = pred_bboxes_tensor[:, :7]
 
     # Get predicted labels if available
     pred_labels = predictions_dict.get('labels_3d', [])
@@ -975,7 +982,6 @@ def make_video_from_frames(
     return video_path, written
 
 
-
 def bev_iou_aligned(box1, box2):
     """
     Approximate IoU in BEV (XY) with axis-aligned boxes.
@@ -1275,6 +1281,11 @@ def main(args):
 
         pred_dict = results_dict['predictions'][0]
         pred_bboxes_3d = np.array(pred_dict['bboxes_3d'])
+
+        # Ensure 7D boxes for metrics & 2D/3D (e.g., nuScenes may output [x,y,z,dx,dy,dz,yaw,vx,vy])
+        if pred_bboxes_3d.ndim == 2 and pred_bboxes_3d.shape[1] > 7:
+            pred_bboxes_3d = pred_bboxes_3d[:, :7]
+
         pred_scores_3d = np.array(pred_dict.get('scores_3d', []))
 
         # Save the raw predictions (JSON)
@@ -1374,6 +1385,7 @@ def main(args):
             fps=fps,
         )
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MMDetection3D Inference Script")
 
@@ -1426,7 +1438,7 @@ if __name__ == "__main__":
                         help="FPS for the generated demo video.")
     parser.add_argument("--video-name", type=str, default="demo_video.mp4",
                         help="Filename for the output MP4."
-)
+                        )
 
     args = parser.parse_args()
 
