@@ -913,45 +913,67 @@ def build_input_dict(primary_file, modality, img_dir, calib_dir, gt_label_dir):
 
 
 def make_video_from_frames(
-    out_dir,
-    pattern="*_2d_vis.png",
-    video_name="demo_video.mp4",
-    fps=10
+    out_dir: str,
+    pattern: str = "*_2d_vis.png",
+    video_name: str = "demo_video.mp4",
+    fps: int = 5,
 ):
-    """
-    Stitches saved 2D visualization PNGs into a demo video.
+    """Create a demo video from saved 2D visualization frames.
 
-    Args:
-        out_dir: directory where *_2d_vis.png were saved
-        pattern: glob pattern to match frame files
-        video_name: output video filename (inside out_dir)
-        fps: frames per second of output video
+    We resize if there are small resolution differences between frames:
+    it picks a target size and resizes all frames before writing them,
+    so OpenCV doesn't silently drop frames.
     """
     frame_paths = sorted(glob.glob(os.path.join(out_dir, pattern)))
     if not frame_paths:
-        print(f"[Video] No frames matching {pattern} in {out_dir}")
-        return
+        print(f"[Video] No frames matching '{pattern}' found in {out_dir}")
+        return None, 0
 
-    # Read first frame to get resolution
-    first = cv2.imread(frame_paths[0])
-    if first is None:
-        print("[Video] Could not read first frame; aborting video creation.")
-        return
+    print(f"[Video] Found {len(frame_paths)} frames:")
+    for i, fp in enumerate(frame_paths):
+        print(f"  {i:02d}: {os.path.basename(fp)}")
 
-    h, w = first.shape[:2]
-    video_path = os.path.join(out_dir, video_name)
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(video_path, fourcc, fps, (w, h))
-
+    # Read all images and record their sizes
+    imgs = []
+    size_counts = {}  # (w, h) -> count
     for fp in frame_paths:
         img = cv2.imread(fp)
         if img is None:
-            print(f"[Video] Warning: could not read frame {fp}, skipping.")
+            print(f"[Video] Warning: could not read {fp}, skipping")
             continue
+        h, w = img.shape[:2]
+        size_counts[(w, h)] = size_counts.get((w, h), 0) + 1
+        imgs.append(img)
+
+    if not imgs:
+        print("[Video] No readable frames, aborting video creation.")
+        return None, 0
+
+    print("\n[Video] Image sizes and counts:")
+    for (w, h), cnt in size_counts.items():
+        print(f"  {w}x{h}: {cnt} frames")
+
+    # Option A: pick the most common resolution as the target
+    (target_w, target_h), _ = max(size_counts.items(), key=lambda kv: kv[1])
+    print(f"[Video] Using target size {target_w}x{target_h}")
+
+    video_path = os.path.join(out_dir, video_name)
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(video_path, fourcc, fps, (target_w, target_h))
+
+    written = 0
+    for img in imgs:
+        h, w = img.shape[:2]
+        if w != target_w or h != target_h:
+            img = cv2.resize(img, (target_w, target_h))
         writer.write(img)
+        written += 1
 
     writer.release()
-    print(f"[Video] Saved demo video to: {video_path}")
+    print(f"\n[Video] Saved video to: {video_path}")
+    print(f"[Video] Frames actually stored in video: {written}")
+    return video_path, written
+
 
 
 def bev_iou_aligned(box1, box2):
@@ -1338,17 +1360,19 @@ def main(args):
 
     summarize_detection_metrics(all_scores, all_tp, all_fp, gt_count)
 
-    # --- Optional: Create demo video from 2D vis frames ---
-    if args.make_video:
-        make_video_from_frames(
-            args.out_dir,
-            pattern="*_2d_vis.png",
-            video_name="demo_video.mp4",
-            fps=args.video_fps
-        )
-
     print(f"\nInference complete. Results saved in {args.out_dir}")
 
+    if args.make_video:
+        print("\n[Video] Building demo video from 2D visualizations...")
+        video_name = args.video_name
+        fps = args.video_fps
+
+        make_video_from_frames(
+            out_dir=args.out_dir,
+            pattern="*_2d_vis.png",
+            video_name=video_name,
+            fps=fps,
+        )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MMDetection3D Inference Script")
@@ -1400,6 +1424,9 @@ if __name__ == "__main__":
                         help="After inference, stitch *_2d_vis.png frames into demo_video.mp4 in out_dir.")
     parser.add_argument('--video-fps', type=int, default=10,
                         help="FPS for the generated demo video.")
+    parser.add_argument("--video-name", type=str, default="demo_video.mp4",
+                        help="Filename for the output MP4."
+)
 
     args = parser.parse_args()
 
