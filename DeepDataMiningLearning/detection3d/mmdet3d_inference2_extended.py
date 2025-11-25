@@ -52,7 +52,7 @@ def load_lidar_file(file_path):
     For .bin, assumes (x, y, z, intensity).
     """
     ext = os.path.splitext(file_path)[-1]
-    
+
     if ext == '.bin':
         # Assuming KITTI-style .bin (x, y, z, intensity)
         points = np.fromfile(file_path, dtype=np.float32).reshape(-1, 4)
@@ -111,50 +111,50 @@ def create_coordinate_axes_with_arrows(size=10.0):
     geometries = []
     arrow_length = size * 0.15  # Arrow head length
     arrow_radius = size * 0.02  # Arrow head radius
-    
+
     # X-axis (Red) - pointing in positive X direction
     x_cylinder = o3d.geometry.TriangleMesh.create_cylinder(
         radius=size * 0.005, height=size - arrow_length)
     x_cylinder.translate([size/2 - arrow_length/2, 0, 0])
     x_cylinder.rotate(np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]]), center=[0, 0, 0])
     x_cylinder.paint_uniform_color([1, 0, 0])  # Red
-    
+
     x_arrow = o3d.geometry.TriangleMesh.create_cone(
         radius=arrow_radius, height=arrow_length)
     x_arrow.translate([size - arrow_length/2, 0, 0])
     x_arrow.rotate(np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]]), center=[0, 0, 0])
     x_arrow.paint_uniform_color([1, 0, 0])  # Red
-    
+
     geometries.extend([x_cylinder, x_arrow])
-    
+
     # Y-axis (Green) - pointing in positive Y direction
     y_cylinder = o3d.geometry.TriangleMesh.create_cylinder(
         radius=size * 0.005, height=size - arrow_length)
     y_cylinder.translate([0, size/2 - arrow_length/2, 0])
     y_cylinder.rotate(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), center=[0, 0, 0])
     y_cylinder.paint_uniform_color([0, 1, 0])  # Green
-    
+
     y_arrow = o3d.geometry.TriangleMesh.create_cone(
         radius=arrow_radius, height=arrow_length)
     y_arrow.translate([0, size - arrow_length/2, 0])
     y_arrow.rotate(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), center=[0, 0, 0])
     y_arrow.paint_uniform_color([0, 1, 0])  # Green
-    
+
     geometries.extend([y_cylinder, y_arrow])
-    
+
     # Z-axis (Blue) - pointing in positive Z direction
     z_cylinder = o3d.geometry.TriangleMesh.create_cylinder(
         radius=size * 0.005, height=size - arrow_length)
     z_cylinder.translate([0, 0, size/2 - arrow_length/2])
     z_cylinder.paint_uniform_color([0, 0, 1])  # Blue
-    
+
     z_arrow = o3d.geometry.TriangleMesh.create_cone(
         radius=arrow_radius, height=arrow_length)
     z_arrow.translate([0, 0, size - arrow_length/2])
     z_arrow.paint_uniform_color([0, 0, 1])  # Blue
-    
+
     geometries.extend([z_cylinder, z_arrow])
-    
+
     return geometries
 
 
@@ -167,20 +167,20 @@ def get_3d_box_corners(bbox_tensor):
     center = bbox_tensor[:3]
     extent = bbox_tensor[3:6]  # l, w, h
     yaw = bbox_tensor[6]
-    
+
     # In KITTI/mmdet3d, z often encodes the bottom center of the box in lidar coords.
     # Open3D OrientedBoundingBox expects the geometric center.
     # Shift z by +h/2 to convert bottom-center -> center.
     center = np.array(center, dtype=float)
     center[2] = float(center[2]) + float(extent[2]) / 2.0
-    
+
     # Create an OrientedBoundingBox
     o3d_bbox = o3d.geometry.OrientedBoundingBox(
-        center, 
-        o3d.geometry.get_rotation_matrix_from_xyz((0, 0, yaw)), 
+        center,
+        o3d.geometry.get_rotation_matrix_from_xyz((0, 0, yaw)),
         extent
     )
-    
+
     # Get the 8 corners
     return np.asarray(o3d_bbox.get_box_points())
 
@@ -194,23 +194,23 @@ def create_open3d_bbox(bbox_tensor, color=[1, 0, 0]):
     center = bbox_tensor[:3]
     extent = bbox_tensor[3:6]  # l, w, h
     yaw = bbox_tensor[6]
-    
+
     # Open3D's rotation matrix is from z-axis
     R = o3d.geometry.get_rotation_matrix_from_xyz((0, 0, yaw))
-    
+
     # Create an OrientedBoundingBox
     # Shift z by +h/2 to convert bottom-center -> geometric center
     c = np.array(center, dtype=float)
     e = np.array(extent, dtype=float)
     c[2] = float(c[2]) + float(e[2]) / 2.0
     o3d_bbox = o3d.geometry.OrientedBoundingBox(c, R, e)
-    
+
     # Create a LineSet from the bounding box
     line_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(o3d_bbox)
-    
+
     # Add the color
     line_set.paint_uniform_color(color)
-    
+
     return line_set
 
 
@@ -285,39 +285,39 @@ def create_text_stroke_label(text, position, color=[1, 1, 1], scale=0.4):
     # Basic vector font (normalized to 1x1 box per glyph)
     # Each glyph is a list of line segments ((x1, y1), (x2, y2))
     glyphs = {
-        'A': [((0,0), (0.5,1)), ((1,0), (0.5,1)), ((0.25,0.5), (0.75,0.5))],
-        'B': [((0,0), (0,1)), ((0,1), (0.6,1)), ((0.6,1),(0.6,0.5)), ((0.6,0.5),(0,0.5)),
-              ((0,0.5),(0.6,0)), ((0.6,0),(0,0))],
-        'C': [((1,0),(0,0)), ((0,0),(0,1)), ((0,1),(1,1))],
-        'D': [((0,0),(0,1)), ((0,1),(0.7,0.85)), ((0.7,0.85),(0.7,0.15)), ((0.7,0.15),(0,0))],
-        'E': [((1,1),(0,1)), ((0,1),(0,0)), ((0,0),(1,0)), ((0,0.5),(0.6,0.5))],
-        'I': [((0.5,0),(0.5,1))],
-        'L': [((0,1),(0,0)), ((0,0),(1,0))],
-        'N': [((0,0),(0,1)), ((0,1),(1,0)), ((1,0),(1,1))],
-        'O': [((0,0),(1,0)), ((1,0),(1,1)), ((1,1),(0,1)), ((0,1),(0,0))],
-        'P': [((0,0),(0,1)), ((0,1),(0.7,1)), ((0.7,1),(0.7,0.6)), ((0.7,0.6),(0,0.6))],
-        'R': [((0,0),(0,1)), ((0,1),(0.7,1)), ((0.7,1),(0.7,0.6)), ((0.7,0.6),(0,0.6)),
-              ((0,0.6),(0.9,0)),],
-        'S': [((1,1),(0.2,1)), ((0.2,1),(0,0.8)), ((0,0.8),(0.8,0.6)), ((0.8,0.6),(1,0.4)),
-              ((1,0.4),(0.2,0.2)), ((0.2,0.2),(0,0))],
-        'T': [((0,1),(1,1)), ((0.5,1),(0.5,0))],
-        'U': [((0,1),(0,0.2)), ((0,0.2),(1,0.2)), ((1,0.2),(1,1))],
-        'V': [((0,1),(0.5,0)), ((0.5,0),(1,1))],
-        'W': [((0,1),(0.25,0)), ((0.25,0),(0.5,0.5)), ((0.5,0.5),(0.75,0)), ((0.75,0),(1,1))],
-        'X': [((0,0),(1,1)), ((1,0),(0,1))],
-        'Y': [((0,1),(0.5,0.5)), ((1,1),(0.5,0.5)), ((0.5,0.5),(0.5,0))],
-        'Z': [((0,1),(1,1)), ((1,1),(0,0)), ((0,0),(1,0))],
-        '0': [((0,0),(1,0)), ((1,0),(1,1)), ((1,1),(0,1)), ((0,1),(0,0)), ((0,0),(1,1))],
-        '1': [((0.5,0),(0.5,1)), ((0.3,0.2),(0.5,0))],
-        '2': [((0,1),(1,1)), ((1,1),(0,0.5)), ((0,0.5),(1,0)), ((1,0),(0,0))],
-        '3': [((0,1),(1,1)), ((1,1),(0.2,0.6)), ((0.2,0.6),(1,0.3)), ((1,0.3),(0,0))],
-        '4': [((0,1),(0,0.4)), ((1,1),(0,0.4)), ((1,1),(1,0))],
-        '5': [((1,1),(0,1)), ((0,1),(0,0.6)), ((0,0.6),(1,0.6)), ((1,0.6),(1,0)), ((1,0),(0,0))],
-        '6': [((1,1),(0,1)), ((0,1),(0,0)), ((0,0),(1,0)), ((1,0),(1,0.6)), ((1,0.6),(0,0.6))],
-        '7': [((0,1),(1,1)), ((1,1),(0,0))],
-        '8': [((0,0),(1,0)), ((1,0),(1,1)), ((1,1),(0,1)), ((0,1),(0,0)), ((0,0.5),(1,0.5))],
-        '9': [((1,0),(1,1)), ((1,1),(0,1)), ((0,1),(0,0.5)), ((0,0.5),(1,0.5))],
-        '-': [((0,0.5),(1,0.5))],
+        'A': [((0, 0), (0.5, 1)), ((1, 0), (0.5, 1)), ((0.25, 0.5), (0.75, 0.5))],
+        'B': [((0, 0), (0, 1)), ((0, 1), (0.6, 1)), ((0.6, 1), (0.6, 0.5)), ((0.6, 0.5), (0, 0.5)),
+              ((0, 0.5), (0.6, 0)), ((0.6, 0), (0, 0))],
+        'C': [((1, 0), (0, 0)), ((0, 0), (0, 1)), ((0, 1), (1, 1))],
+        'D': [((0, 0), (0, 1)), ((0, 1), (0.7, 0.85)), ((0.7, 0.85), (0.7, 0.15)), ((0.7, 0.15), (0, 0))],
+        'E': [((1, 1), (0, 1)), ((0, 1), (0, 0)), ((0, 0), (1, 0)), ((0, 0.5), (0.6, 0.5))],
+        'I': [((0.5, 0), (0.5, 1))],
+        'L': [((0, 1), (0, 0)), ((0, 0), (1, 0))],
+        'N': [((0, 0), (0, 1)), ((0, 1), (1, 0)), ((1, 0), (1, 1))],
+        'O': [((0, 0), (1, 0)), ((1, 0), (1, 1)), ((1, 1), (0, 1)), ((0, 1), (0, 0))],
+        'P': [((0, 0), (0, 1)), ((0, 1), (0.7, 1)), ((0.7, 1), (0.7, 0.6)), ((0.7, 0.6), (0, 0.6))],
+        'R': [((0, 0), (0, 1)), ((0, 1), (0.7, 1)), ((0.7, 1), (0.7, 0.6)), ((0.7, 0.6), (0, 0.6)),
+              ((0, 0.6), (0.9, 0)), ],
+        'S': [((1, 1), (0.2, 1)), ((0.2, 1), (0, 0.8)), ((0, 0.8), (0.8, 0.6)), ((0.8, 0.6), (1, 0.4)),
+              ((1, 0.4), (0.2, 0.2)), ((0.2, 0.2), (0, 0))],
+        'T': [((0, 1), (1, 1)), ((0.5, 1), (0.5, 0))],
+        'U': [((0, 1), (0, 0.2)), ((0, 0.2), (1, 0.2)), ((1, 0.2), (1, 1))],
+        'V': [((0, 1), (0.5, 0)), ((0.5, 0), (1, 1))],
+        'W': [((0, 1), (0.25, 0)), ((0.25, 0), (0.5, 0.5)), ((0.5, 0.5), (0.75, 0)), ((0.75, 0), (1, 1))],
+        'X': [((0, 0), (1, 1)), ((1, 0), (0, 1))],
+        'Y': [((0, 1), (0.5, 0.5)), ((1, 1), (0.5, 0.5)), ((0.5, 0.5), (0.5, 0))],
+        'Z': [((0, 1), (1, 1)), ((1, 1), (0, 0)), ((0, 0), (1, 0))],
+        '0': [((0, 0), (1, 0)), ((1, 0), (1, 1)), ((1, 1), (0, 1)), ((0, 1), (0, 0)), ((0, 0), (1, 1))],
+        '1': [((0.5, 0), (0.5, 1)), ((0.3, 0.2), (0.5, 0))],
+        '2': [((0, 1), (1, 1)), ((1, 1), (0, 0.5)), ((0, 0.5), (1, 0)), ((1, 0), (0, 0))],
+        '3': [((0, 1), (1, 1)), ((1, 1), (0.2, 0.6)), ((0.2, 0.6), (1, 0.3)), ((1, 0.3), (0, 0))],
+        '4': [((0, 1), (0, 0.4)), ((1, 1), (0, 0.4)), ((1, 1), (1, 0))],
+        '5': [((1, 1), (0, 1)), ((0, 1), (0, 0.6)), ((0, 0.6), (1, 0.6)), ((1, 0.6), (1, 0)), ((1, 0), (0, 0))],
+        '6': [((1, 1), (0, 1)), ((0, 1), (0, 0)), ((0, 0), (1, 0)), ((1, 0), (1, 0.6)), ((1, 0.6), (0, 0.6))],
+        '7': [((0, 1), (1, 1)), ((1, 1), (0, 0))],
+        '8': [((0, 0), (1, 0)), ((1, 0), (1, 1)), ((1, 1), (0, 1)), ((0, 1), (0, 0)), ((0, 0.5), (1, 0.5))],
+        '9': [((1, 0), (1, 1)), ((1, 1), (0, 1)), ((0, 1), (0, 0.5)), ((0, 0.5), (1, 0.5))],
+        '-': [((0, 0.5), (1, 0.5))],
         ' ': [],
     }
 
@@ -361,10 +361,10 @@ def create_text_stroke_label(text, position, color=[1, 1, 1], scale=0.4):
 def get_bbox_top_center(bbox_tensor):
     """
     Gets the top center position of a 3D bounding box for label placement.
-    
+
     Args:
         bbox_tensor: 7D bounding box [x, y, z, dx, dy, dz, heading]
-    
+
     Returns:
         3D position [x, y, z] at the top center of the box
     """
@@ -388,7 +388,7 @@ def load_kitti_gt_labels(label_file):
     Loads KITTI-style ground truth labels from a .txt file.
     Only loads 'Car', 'Van', 'Truck' and converts to 7D bbox format.
     (h, w, l, x, y, z, yaw) -> (x_cam, y_cam, z_cam, l, w, h, yaw_lidar)
-    
+
     Returns: List of 7D bbox tensors [x, y, z, l, w, h, yaw] in LiDAR coords.
     """
     gt_bboxes = []
@@ -396,37 +396,37 @@ def load_kitti_gt_labels(label_file):
         for line in f:
             parts = line.strip().split(' ')
             obj_type = parts[0]
-            
+
             # We only care about objects for detection
             if obj_type not in ['Car', 'Van', 'Truck', 'Pedestrian', 'Cyclist']:
                 continue
-                
+
             # h, w, l (dimensions in camera_coords)
             h, w, l = map(float, parts[8:11])
-            
+
             # x, y, z (center in camera_coords)
             x_cam, y_cam, z_cam = map(float, parts[11:14])
-            
+
             # yaw (in camera_coords)
             yaw_cam = float(parts[14])
-            
+
             # Convert camera-coord box to LiDAR-coord box
             # In mmdet3d (for KITTI):
             #   - x_lidar = z_cam
             #   - y_lidar = -x_cam
             #   - z_lidar = -y_cam
             #   - yaw_lidar = -yaw_cam - pi/2
-            
+
             x_lidar = z_cam
             y_lidar = -x_cam
             # KITTI 'y_cam' is the bottom-center in camera coords; using -y_cam aligns
             # GT centers with LiDAR z without adding h/2 offset, which can bias height.
             z_lidar = -y_cam
             yaw_lidar = -yaw_cam - (np.pi / 2.0)
-            
+
             # We use [x, y, z, l, w, h, yaw]
             gt_bboxes.append(np.array([x_lidar, y_lidar, z_lidar, l, w, h, yaw_lidar]))
-            
+
     return gt_bboxes
 
 
@@ -444,11 +444,11 @@ def read_kitti_calib(calib_file):
 
     # Get P2 (projection matrix for cam 2)
     P2 = calib['P2'].reshape(3, 4)
-    
+
     # Get Velo-to-Cam0 transform
     Tr_velo_to_cam = calib['Tr_velo_to_cam'].reshape(3, 4)
     Tr_velo_to_cam = np.vstack([Tr_velo_to_cam, [0, 0, 0, 1]])
-    
+
     # Get R0_rect (rectification matrix)
     R0_rect = calib['R0_rect'].reshape(3, 3)
     R0_rect = np.hstack([R0_rect, np.zeros((3, 1))])
@@ -456,7 +456,7 @@ def read_kitti_calib(calib_file):
 
     # Velo -> CamRect
     Tr_velo_to_rect = R0_rect @ Tr_velo_to_cam
-    
+
     return P2, Tr_velo_to_rect
 
 
@@ -466,21 +466,21 @@ def project_lidar_to_image(points_lidar, P2, Tr_velo_to_rect):
     """
     # Add homogeneous coordinate
     points_lidar_hom = np.hstack((points_lidar, np.ones((points_lidar.shape[0], 1))))
-    
+
     # Transform to rectified camera coordinates
     points_cam_rect = (Tr_velo_to_rect @ points_lidar_hom.T).T
-    
+
     # Filter points in front of camera
     in_front = points_cam_rect[:, 2] > 0
     points_cam_rect_in_front = points_cam_rect[in_front]
-    
+
     # Project to image plane
     points_cam_rect_hom = np.hstack((points_cam_rect_in_front[:, :3], np.ones((points_cam_rect_in_front.shape[0], 1))))
     points_img_hom = (P2 @ points_cam_rect_hom.T).T
-    
+
     # Normalize by z
     points_img = points_img_hom[:, :2] / points_img_hom[:, 2, np.newaxis]
-    
+
     # Return only points that are in front
     return points_img, in_front
 
@@ -564,12 +564,12 @@ def draw_projected_boxes_on_image(image_path, calib_path, pred_bboxes_3d, gt_bbo
     print(f"  > Saved 2D visualization: {out_path}")
 
 
-def visualize_with_open3d(lidar_file, predictions_dict, gt_bboxes, out_dir, basename, 
+def visualize_with_open3d(lidar_file, predictions_dict, gt_bboxes, out_dir, basename,
                           headless=False, img_file=None, calib_file=None):
     """
     Visualizes the point cloud and predicted/gt boxes using Open3D with enhanced features.
     Saves to .ply in headless mode, otherwise shows an interactive window.
-    
+
     Args:
         lidar_file: Path to LiDAR point cloud file
         predictions_dict: Dictionary containing prediction results
@@ -584,26 +584,26 @@ def visualize_with_open3d(lidar_file, predictions_dict, gt_bboxes, out_dir, base
     points = load_lidar_file(lidar_file)
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points[:, :3])
-    
+
     # Color points by height with high contrast colors (blue to red)
     pcd_colors = color_points_by_height(points)
     pcd.colors = o3d.utility.Vector3dVector(pcd_colors)
-    
+
     # Get predicted boxes and labels
     pred_bboxes_list = predictions_dict['bboxes_3d']
     pred_bboxes_tensor = np.array(pred_bboxes_list)
-    
+
     # Get predicted labels if available
     pred_labels = predictions_dict.get('labels_3d', [])
     pred_scores = predictions_dict.get('scores_3d', [])
-    
+
     # Create geometries list starting with point cloud
     geometries = [pcd]
-    
+
     # Add compact coordinate frame at origin (smaller to avoid overflow)
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0)
     geometries.append(coordinate_frame)
-    
+
     # Create geometries for predicted boxes (Green)
     pred_line_sets = []
     pred_text_line_sets = []
@@ -634,7 +634,7 @@ def visualize_with_open3d(lidar_file, predictions_dict, gt_bboxes, out_dir, base
         text_ls = create_text_stroke_label(cls_name, top_pos, color=[1.0, 1.0, 1.0], scale=0.6)
         geometries.append(text_ls)
         pred_text_line_sets.append(text_ls)
-    
+
     # Create geometries for ground truth boxes (Red)
     gt_line_sets = []
     for i, bbox in enumerate(gt_bboxes):
@@ -654,7 +654,7 @@ def visualize_with_open3d(lidar_file, predictions_dict, gt_bboxes, out_dir, base
                                           pred_labels=pred_labels, class_names=class_names)
         except Exception as e:
             print(f"  > Warning: Could not generate 2D visualization. {e}")
-    
+
     if headless:
         print(f"  > Headless mode. Saving to .ply files in {out_dir}")
         pcd_file = Path(out_dir) / f"{basename}_points.ply"
@@ -662,12 +662,12 @@ def visualize_with_open3d(lidar_file, predictions_dict, gt_bboxes, out_dir, base
         pred_bbox_file = Path(out_dir) / f"{basename}_pred_bboxes.ply"
         pred_label_file = Path(out_dir) / f"{basename}_pred_labels.ply"
         gt_bbox_file = Path(out_dir) / f"{basename}_gt_bboxes.ply"
-        
+
         o3d.io.write_point_cloud(str(pcd_file), pcd)
-        
+
         # Save coordinate frame mesh
         o3d.io.write_triangle_mesh(str(axes_file.with_suffix('.ply')), coordinate_frame)
-        
+
         # Save bounding boxes (combine into single LineSet for each group)
         if len(pred_line_sets) > 0:
             combined_pred = combine_line_sets(pred_line_sets, color=[0.0, 1.0, 0.0])
@@ -675,7 +675,7 @@ def visualize_with_open3d(lidar_file, predictions_dict, gt_bboxes, out_dir, base
         if len(gt_line_sets) > 0:
             combined_gt = combine_line_sets(gt_line_sets, color=[1.0, 0.0, 0.0])
             o3d.io.write_line_set(str(gt_bbox_file), combined_gt)
-            
+
         print(f"  > Saved points: {pcd_file}")
         print(f"  > Saved coordinate axes: {axes_file}")
         if len(pred_bboxes_tensor) > 0:
@@ -692,7 +692,7 @@ def visualize_with_open3d(lidar_file, predictions_dict, gt_bboxes, out_dir, base
         print(f"  > Coordinate axes with arrows: X=Red, Y=Green, Z=Blue")
         print(f"  > Predicted boxes: Green, Ground truth boxes: Red")
         print(f"  > Markers: Green pred center, Red GT center, White top text")
-        
+
         o3d.visualization.draw_geometries(
             geometries,
             window_name=f"Enhanced 3D Visualization: {basename}",
@@ -704,18 +704,18 @@ def visualize_with_open3d(lidar_file, predictions_dict, gt_bboxes, out_dir, base
 def find_matching_file(basename, directory, extensions):
     """
     Find a file with the given basename and one of the given extensions in the directory.
-    
+
     Args:
         basename: Base filename without extension
         directory: Directory to search in (can be None)
         extensions: List of extensions to try (e.g., ['.png', '.jpg'])
-    
+
     Returns:
         Full path to matching file, or None if not found
     """
     if not directory or not os.path.isdir(directory):
         return None
-        
+
     for ext in extensions:
         candidate = os.path.join(directory, basename + ext)
         if os.path.isfile(candidate):
@@ -723,51 +723,57 @@ def find_matching_file(basename, directory, extensions):
     return None
 
 
-def build_kitti_input_list(base_folder, frame_number=None):
+def build_kitti_input_list(base_folder, frame_number=None, max_frames=None):
     """
     Build input list for KITTI dataset structure.
-    
+
     Args:
         base_folder (str): Base KITTI dataset folder
         frame_number (str): Specific frame number (e.g., '000008') or '-1' for all frames
-        
+        max_frames (int or None): If not None and frame_number == '-1',
+                                  limit to first max_frames frames (sorted).
+
     Returns:
         list: List of input dictionaries with KITTI data paths
     """
     import glob
-    
+
     # KITTI folder structure
     velodyne_dir = os.path.join(base_folder, 'velodyne')
     image_dir = os.path.join(base_folder, 'image_2')
     calib_dir = os.path.join(base_folder, 'calib')
     label_dir = os.path.join(base_folder, 'label_2')
-    
+
     # Check if required directories exist
     if not os.path.exists(velodyne_dir):
         raise ValueError(f"KITTI velodyne directory not found: {velodyne_dir}")
-    
+
     inputs_list = []
-    
+
     if frame_number == '-1' or frame_number is None:
         # Get all frames
         velodyne_files = sorted(glob.glob(os.path.join(velodyne_dir, '*.bin')))
         frame_numbers = [os.path.splitext(os.path.basename(f))[0] for f in velodyne_files]
+
+        if max_frames is not None:
+            frame_numbers = frame_numbers[:max_frames]
+            print(f"Limiting to first {max_frames} KITTI frames: {frame_numbers}")
     else:
         # Get specific frame
         frame_numbers = [frame_number]
-    
+
     for frame_num in frame_numbers:
         # Build paths for this frame
         velodyne_file = os.path.join(velodyne_dir, f'{frame_num}.bin')
         image_file = os.path.join(image_dir, f'{frame_num}.png')
         calib_file = os.path.join(calib_dir, f'{frame_num}.txt')
         label_file = os.path.join(label_dir, f'{frame_num}.txt')
-        
+
         # Check if velodyne file exists (required)
         if not os.path.exists(velodyne_file):
             print(f"Warning: Velodyne file not found for frame {frame_num}: {velodyne_file}")
             continue
-            
+
         input_dict = {
             'points': velodyne_file,
             'img': image_file if os.path.exists(image_file) else None,
@@ -775,9 +781,9 @@ def build_kitti_input_list(base_folder, frame_number=None):
             'gt_label': label_file if os.path.exists(label_file) else None,
             'frame_id': frame_num
         }
-        
+
         inputs_list.append(input_dict)
-        
+
     print(f"Found {len(inputs_list)} KITTI frames to process")
     return inputs_list
 
@@ -785,34 +791,34 @@ def build_kitti_input_list(base_folder, frame_number=None):
 def build_waymokitti_input_list(base_folder, frame_number=None):
     """
     Build input list for WaymoKITTI dataset structure (generated by waymo2kitti.py).
-    
+
     Args:
         base_folder (str): Base WaymoKITTI dataset folder
         frame_number (str): Specific frame number or '-1' for all frames
-        
+
     Returns:
         list: List of input dictionaries with WaymoKITTI data paths
     """
     import glob
-    
+
     # WaymoKITTI folder structure (similar to KITTI but may have different naming)
     velodyne_dir = os.path.join(base_folder, 'velodyne')
     image_dir = os.path.join(base_folder, 'image_0')  # WaymoKITTI often uses image_0
     calib_dir = os.path.join(base_folder, 'calib')
     label_dir = os.path.join(base_folder, 'label_0')  # WaymoKITTI often uses label_0
-    
+
     # Fallback to standard KITTI naming if waymo-specific doesn't exist
     if not os.path.exists(image_dir):
         image_dir = os.path.join(base_folder, 'image_2')
     if not os.path.exists(label_dir):
         label_dir = os.path.join(base_folder, 'label_2')
-    
+
     # Check if required directories exist
     if not os.path.exists(velodyne_dir):
         raise ValueError(f"WaymoKITTI velodyne directory not found: {velodyne_dir}")
-    
+
     inputs_list = []
-    
+
     if frame_number == '-1' or frame_number is None:
         # Get all frames
         velodyne_files = sorted(glob.glob(os.path.join(velodyne_dir, '*.bin')))
@@ -820,19 +826,19 @@ def build_waymokitti_input_list(base_folder, frame_number=None):
     else:
         # Get specific frame
         frame_numbers = [frame_number]
-    
+
     for frame_num in frame_numbers:
         # Build paths for this frame
         velodyne_file = os.path.join(velodyne_dir, f'{frame_num}.bin')
         image_file = os.path.join(image_dir, f'{frame_num}.png')
         calib_file = os.path.join(calib_dir, f'{frame_num}.txt')
         label_file = os.path.join(label_dir, f'{frame_num}.txt')
-        
+
         # Check if velodyne file exists (required)
         if not os.path.exists(velodyne_file):
             print(f"Warning: Velodyne file not found for frame {frame_num}: {velodyne_file}")
             continue
-            
+
         input_dict = {
             'points': velodyne_file,
             'img': image_file if os.path.exists(image_file) else None,
@@ -840,9 +846,9 @@ def build_waymokitti_input_list(base_folder, frame_number=None):
             'gt_label': label_file if os.path.exists(label_file) else None,
             'frame_id': frame_num
         }
-        
+
         inputs_list.append(input_dict)
-        
+
     print(f"Found {len(inputs_list)} WaymoKITTI frames to process")
     return inputs_list
 
@@ -850,14 +856,14 @@ def build_waymokitti_input_list(base_folder, frame_number=None):
 def build_input_dict(primary_file, modality, img_dir, calib_dir, gt_label_dir):
     """
     Build input dictionary for a single sample, finding matching files in provided directories.
-    
+
     Args:
         primary_file: Path to the primary input file (LiDAR .bin or image)
         modality: 'lidar', 'mono', or 'multi-modal'
         img_dir: Directory containing image files (can be None)
         calib_dir: Directory containing calibration files (can be None)
         gt_label_dir: Directory containing ground truth label files (can be None)
-    
+
     Returns:
         Dictionary with input file paths
     """
@@ -869,7 +875,7 @@ def build_input_dict(primary_file, modality, img_dir, calib_dir, gt_label_dir):
     else:
         # lidar or multi-modal
         input_dict['points'] = str(primary_file)
-        
+
     # --- 1. Find matching image file ---
     img_exts = ['.png', '.jpg', '.jpeg']
     if img_dir and os.path.isdir(img_dir):
@@ -1081,20 +1087,23 @@ DEFAULT_CALIB = '/data/Datasets/kitti/training/calib/000008.txt'
 DEFAULT_IMG = '/data/Datasets/kitti/training/image_2/000008.png'
 # --- End Defaults ---
 
+# --- Evaluation subset size used for KITTI and 'any' (e.g., nuScenes) when frame_number == -1 ---
+MAX_EVAL_SAMPLES = 20
+
 
 def main(args):
     # --- 1. Initialize Model ---
     print(f"Initializing {args.modality} inferencer...")
-    
+
     model_path = args.model
     checkpoint_path = args.checkpoint
-    
+
     # --- New Logic for default checkpoint ---
     if args.model == DEFAULT_MODEL and args.checkpoint is None:
         print(f"Using default model, setting default checkpoint: {DEFAULT_CHECKPOINT}")
         checkpoint_path = DEFAULT_CHECKPOINT
     # --- End New Logic ---
-    
+
     # Handle auto-download for model names
     if not os.path.isfile(args.model):
         if not checkpoint_path:
@@ -1116,7 +1125,7 @@ def main(args):
     else:
         print(f"Error: Unknown modality '{args.modality}'")
         exit()
-        
+
     inferencer = InferencerClass(
         model_path,
         checkpoint_path,
@@ -1127,24 +1136,29 @@ def main(args):
     is_headless = args.headless or not os.environ.get('DISPLAY')
     if is_headless:
         print("Running in headless mode. Visualizations will be saved to files.")
-    
+
     # --- 2. Gather all inputs based on dataset mode ---
     inputs_list = []
-    
+
     if args.dataset == 'kitti':
         print(f"Using KITTI dataset mode with base folder: {args.input_path}")
         if not os.path.isdir(args.input_path):
             print(f"Error: KITTI base folder does not exist: {args.input_path}")
             return
-        inputs_list = build_kitti_input_list(args.input_path, args.frame_number)
-        
+        # If frame_number == -1, limit to first MAX_EVAL_SAMPLES frames
+        inputs_list = build_kitti_input_list(
+            args.input_path,
+            args.frame_number,
+            max_frames=MAX_EVAL_SAMPLES if args.frame_number == '-1' else None
+        )
+
     elif args.dataset == 'waymokitti':
         print(f"Using WaymoKITTI dataset mode with base folder: {args.input_path}")
         if not os.path.isdir(args.input_path):
             print(f"Error: WaymoKITTI base folder does not exist: {args.input_path}")
             return
         inputs_list = build_waymokitti_input_list(args.input_path, args.frame_number)
-        
+
     else:  # args.dataset == 'any'
         print("Using manual path mode (any dataset)")
         if os.path.isfile(args.input_path):
@@ -1156,14 +1170,24 @@ def main(args):
                 file_exts = ('.png', '.jpg', '.jpeg')
             else:
                 file_exts = ('.bin', '.ply', '.pcd')
-                
+
             print(f"Scanning folder: {args.input_path}")
-            for fname in sorted(os.listdir(args.input_path)):
-                if fname.lower().endswith(file_exts):
-                    primary_file = os.path.join(args.input_path, fname)
-                    inputs_list.append(
-                        build_input_dict(primary_file, args.modality, args.img_dir, args.calib_dir, args.gt_label_dir)
-                    )
+            all_files = sorted(
+                [fname for fname in os.listdir(args.input_path)
+                 if fname.lower().endswith(file_exts)]
+            )
+
+            # If frame_number == -1, limit to first MAX_EVAL_SAMPLES files
+            if args.frame_number == '-1':
+                all_files = all_files[:MAX_EVAL_SAMPLES]
+                print(f"Limiting to first {MAX_EVAL_SAMPLES} files in directory.")
+                print("Selected files:", all_files)
+
+            for fname in all_files:
+                primary_file = os.path.join(args.input_path, fname)
+                inputs_list.append(
+                    build_input_dict(primary_file, args.modality, args.img_dir, args.calib_dir, args.gt_label_dir)
+                )
         else:
             print(f"Error: Input path does not exist: {args.input_path}")
             return
@@ -1171,7 +1195,7 @@ def main(args):
     if not inputs_list:
         print("Error: No valid input files found.")
         return
-        
+
     print(f"Found {len(inputs_list)} samples to infer.")
 
     # --- Metrics accumulators ---
@@ -1186,7 +1210,7 @@ def main(args):
 
     # --- 3. Run Inference & Visualize ---
     for single_input in inputs_list:
-        
+
         # Determine the basename and primary file based on dataset mode
         if args.dataset in ['kitti', 'waymokitti']:
             basename = single_input.get('frame_id', 'unknown_frame')
@@ -1195,7 +1219,7 @@ def main(args):
             primary_input_key = 'img' if args.modality == 'mono' else 'points'
             primary_file = single_input[primary_input_key]
             basename = Path(primary_file).stem
-            
+
         print(f"\nRunning inference on input: {basename}")
 
         # Load GT labels if available
@@ -1205,11 +1229,11 @@ def main(args):
                 gt_bboxes_3d = load_kitti_gt_labels(single_input['gt_label'])
             except Exception as e:
                 print(f"  > Warning: Could not load GT labels. {e}")
-        
+
         # Prepare input for inferencer based on dataset mode
         # Pass the full dict so inferencer can use all available info
         inferencer_input = single_input
-        
+
         # Run inference with timing
         start_time = time.time()
         results_dict = inferencer(
@@ -1226,7 +1250,7 @@ def main(args):
             mem = torch.cuda.max_memory_allocated() / (1024 ** 2)  # MB
             if mem > max_gpu_mem:
                 max_gpu_mem = mem
-        
+
         pred_dict = results_dict['predictions'][0]
         pred_bboxes_3d = np.array(pred_dict['bboxes_3d'])
         pred_scores_3d = np.array(pred_dict.get('scores_3d', []))
@@ -1282,11 +1306,11 @@ def main(args):
             # Determine lidar file path based on dataset mode
             # Use the 'points' key across all modes
             lidar_file = single_input['points']
-            
+
             # Pass image and calibration files if available for enhanced visualization
             img_file = single_input.get('img', None)
             calib_file = single_input.get('calib', None)
-            
+
             visualize_with_open3d(
                 lidar_file,
                 pred_dict,
@@ -1299,7 +1323,7 @@ def main(args):
             )
         else:
             print("  > Monocular model. Skipping Open3D visualization.")
-    
+
     # --- Summarize metrics ---
     if len(per_frame_times) > 0:
         avg_time = float(np.mean(per_frame_times))
@@ -1322,41 +1346,41 @@ def main(args):
             video_name="demo_video.mp4",
             fps=args.video_fps
         )
-            
+
     print(f"\nInference complete. Results saved in {args.out_dir}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MMDetection3D Inference Script")
-    
+
     # Dataset mode selection
     parser.add_argument('--dataset', type=str, default='kitti',
                         choices=['any', 'kitti', 'waymokitti'],
                         help="Dataset mode: 'any' (manual paths), 'kitti' (KITTI dataset structure), 'waymokitti' (Waymo2KITTI structure)")
-    
-    parser.add_argument('--model', type=str, 
+
+    parser.add_argument('--model', type=str,
                         default=DEFAULT_MODEL,
                         help="Model name (e.g., 'pointpillars_kitti') or path to config file.")
-    
+
     # Dataset-specific arguments
-    parser.add_argument('--input-path', type=str, 
+    parser.add_argument('--input-path', type=str,
                         default="/data/Datasets/kitti/training/",
                         help="Path to input. For 'any': LiDAR file/folder or image file/folder. For 'kitti'/'waymokitti': dataset base folder.")
     parser.add_argument('--frame-number', type=str, default='000008',
-                        help="Frame number for KITTI/WaymoKITTI datasets (e.g., '000008'). Use -1 for all frames in dataset.")
-    
-    parser.add_argument('--out-dir', type=str, 
+                        help="Frame number for KITTI/WaymoKITTI datasets (e.g., '000008'). Use -1 for subset/all frames in dataset.")
+
+    parser.add_argument('--out-dir', type=str,
                         default='./inference_results',
                         help="Directory to save prediction results and visualizations.")
-    
+
     parser.add_argument('--modality', type=str, default='lidar',
                         choices=['lidar', 'mono', 'multi-modal'],
                         help="Modality of the model (e.g., 'lidar', 'mono', 'multi-modal').")
-    
+
     parser.add_argument('--checkpoint', type=str, default=DEFAULT_CHECKPOINT,
                         help=("Optional path or URL to checkpoint. If 'model' is a name, will auto-download if not provided. "
                               f"Defaults to {DEFAULT_CHECKPOINT} if default model is used."))
-    
+
     # Manual path args (used only with --dataset=any)
     parser.add_argument('--img-dir', type=str, default=None,
                         help="(Optional) Directory of camera images. Only used with --dataset=any.")
@@ -1364,7 +1388,7 @@ if __name__ == "__main__":
                         help="(Optional) Directory of calibration files (e.g., KITTI-style .txt). Only used with --dataset=any.")
     parser.add_argument('--gt-label-dir', type=str, default=None,
                         help="(Optional) Directory of ground truth label files (e.g., KITTI-style .txt). Only used with --dataset=any.")
-    
+
     parser.add_argument('--score-thr', type=float, default=0.3,
                         help="Score threshold for filtering predictions.")
     parser.add_argument('--device', type=str, default='cuda:0',
@@ -1376,9 +1400,9 @@ if __name__ == "__main__":
                         help="After inference, stitch *_2d_vis.png frames into demo_video.mp4 in out_dir.")
     parser.add_argument('--video-fps', type=int, default=10,
                         help="FPS for the generated demo video.")
-    
+
     args = parser.parse_args()
-    
+
     # Update default paths from relative to absolute
     if not Path(args.model).is_absolute() and args.model == DEFAULT_MODEL:
         args.model = str(Path.cwd() / args.model)
@@ -1386,5 +1410,5 @@ if __name__ == "__main__":
         args.checkpoint = str(Path.cwd() / args.checkpoint)
     if not Path(args.input_path).is_absolute() and args.input_path == DEFAULT_INPUT:
         args.input_path = str(Path.cwd() / args.input_path)
-    
+
     main(args)
